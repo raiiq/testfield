@@ -7,15 +7,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#050505',
-        surface: '#121212',
-        primary: '#FF3B30', // Cinematic Red
+        background: '#000000',
+        surface: '#101010',
+        primary: '#DEDBC8',
         secondary: '#007AFF', // Cinematic Blue (optional)
         glass: 'rgba(255, 255, 255, 0.05)',
         'glass-border': 'rgba(255, 255, 255, 0.1)',
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Almarai', 'sans-serif'],
+        serif: ['"Instrument Serif"', 'serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, LayoutDashboard, User, Menu, X, LogIn, Terminal, Activity, ShieldCheck, Share2, QrCode } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 
 const Navbar = () => {
@@ -13,6 +13,7 @@ const Navbar = () => {
     const [hoveredTab, setHoveredTab] = useState(null);
     const [isQRVisible, setIsQRVisible] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
     const isAdminPage = location.pathname.startsWith('/admin');
 
     const scrollToSection = (id) => {
@@ -30,17 +31,37 @@ const Navbar = () => {
             });
             setIsMenuOpen(false);
             setIsMobileMenuOpen(false);
+        } else {
+            // Element not found on current page, maybe we are not on home
+            if (location.pathname !== '/') {
+                navigate(`/#${id}`);
+                setIsMenuOpen(false);
+                setIsMobileMenuOpen(false);
+            }
         }
     };
 
     if (isAdminPage) return null;
 
     const navItems = [
-        { label: 'STATION', id: 'hero' },
-        { label: 'ARCHIVE', id: 'work' },
-        { label: 'ROADMAP', id: 'resume' },
-        { label: 'UPLINK', id: 'contact' }
+        { label: 'STATION', id: 'hero', path: '/' },
+        { label: 'ARCHIVE', id: 'work', path: '/' },
+        { label: 'ROADMAP', id: 'resume', path: '/' },
+        { label: 'CV BUILDER', path: '/cv-customize' },
+        { label: 'UPLINK', id: 'contact', path: '/' }
     ];
+
+    const handleNavClick = (item) => {
+        if (item.path && item.path !== '/' && location.pathname !== item.path) {
+            navigate(item.path);
+            setIsMenuOpen(false);
+            setIsMobileMenuOpen(false);
+            return;
+        }
+        if (item.id) {
+            scrollToSection(item.id);
+        }
+    };
 
     // Liquid Pod Spring Config
     const podSpring = { type: "spring", stiffness: 400, damping: 30 };
@@ -125,30 +146,33 @@ const Navbar = () => {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={podSpring}
-                className="hidden lg:flex items-center gap-1 bg-white/[0.03] backdrop-blur-[80px] border border-white/10 px-2 py-2 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.3)] pointer-events-auto relative"
+                className="hidden lg:flex items-center gap-4 sm:gap-8 lg:gap-12 bg-black rounded-b-2xl md:rounded-b-3xl px-6 py-3 pointer-events-auto relative shadow-[0_10px_30px_rgba(0,0,0,0.5)] border-b border-x border-white/10 mt-[-16px] sm:mt-[-32px]"
                 onMouseLeave={() => setHoveredTab(null)}
             >
-                {navItems.map((item) => (
-                    <button
-                        key={item.id}
-                        onMouseEnter={() => setHoveredTab(item.id)}
-                        onClick={() => scrollToSection(item.id)}
-                        className={`text-[10px] font-black uppercase tracking-[0.3em] px-6 py-2 transition-all relative z-10 ${hoveredTab === item.id || location.hash === `#${item.id}` ? 'text-white' : 'text-gray-500'
-                            }`}
-                    >
-                        <span className={hoveredTab === item.id ? 'halation text-glow-red text-primary' : ''}>
-                            {item.label}
-                        </span>
+                {navItems.map((item, idx) => {
+                    const identifier = item.id || item.label;
+                    const isActive = location.pathname === item.path || (location.pathname === '/' && location.hash === `#${item.id}`);
+                    return (
+                        <button
+                            key={idx}
+                            onMouseEnter={() => setHoveredTab(identifier)}
+                            onClick={() => handleNavClick(item)}
+                            className={`text-[10px] font-sans font-medium uppercase tracking-[0.2em] transition-colors relative z-10 ${hoveredTab === identifier || isActive ? 'text-[#E1E0CC]' : 'text-[#E1E0CC]/70'}`}
+                        >
+                            <span>
+                                {item.label}
+                            </span>
 
-                        {hoveredTab === item.id && (
-                            <motion.div
-                                layoutId="nav-pill"
-                                className="absolute inset-0 bg-white/[0.1] rounded-full -z-10"
-                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                            />
-                        )}
-                    </button>
-                ))}
+                            {hoveredTab === identifier && (
+                                <motion.div
+                                    layoutId="nav-pill"
+                                    className="absolute inset-0 bg-white/[0.1] rounded-full -z-10"
+                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                />
+                            )}
+                        </button>
+                    )
+                })}
             </motion.div>
 
             {/* Auth/Action Pod & Mobile Toggle */}
@@ -325,14 +349,11 @@ const Navbar = () => {
                         <div className="flex flex-col items-center justify-center flex-1 gap-8 p-10">
                             <div className="w-full space-y-2">
                                 <p className="text-[10px] text-primary font-black uppercase tracking-[0.4em] mb-6 text-center halation">Navigation Node</p>
-                                {navItems.map((item) => (
+                                {navItems.map((item, idx) => (
                                     <motion.button
-                                        key={item.id}
+                                        key={idx}
                                         whileHover={{ x: 10 }}
-                                        onClick={() => {
-                                            scrollToSection(item.id);
-                                            setIsMobileMenuOpen(false);
-                                        }}
+                                        onClick={() => handleNavClick(item)}
                                         className="w-full py-4 text-3xl font-black text-white uppercase tracking-tighter border-b border-white/5 hover:text-primary transition-colors text-center"
                                     >
                                         {item.label}

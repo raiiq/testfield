@@ -5,6 +5,7 @@ import Gallery from './components/Gallery';
 import Resume from './components/Resume';
 import Contact from './components/Contact';
 import Dashboard from './components/Dashboard';
+import CVCustomize from './components/CVCustomize';
 import LiquidBackground from './components/LiquidBackground';
 import GlobalWormhole from './components/GlobalWormhole';
 
@@ -12,9 +13,12 @@ import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { Routes, Route } from 'react-router-dom';
 
+import About from './components/About';
+
 const Home = () => (
   <>
     <Hero />
+    <About />
     <Gallery />
     <Resume />
     <Contact />
@@ -36,6 +40,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/admin" element={<Dashboard />} />
+              <Route path="/cv-customize" element={<CVCustomize />} />
             </Routes>
           </div>
         </div>
