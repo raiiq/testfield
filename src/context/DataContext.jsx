@@ -200,9 +200,10 @@ export const DataProvider = ({ children }) => {
 
     const fetchSettings = useCallback(async () => {
         try {
-            const { data, error } = await supabase.from('site_settings').select('*').single();
+            const { data, error } = await supabase.from('site_settings').select('*').maybeSingle();
             if (error) throw error;
             if (data) setSettings(data);
+            else setSettings(localSettings);
         } catch (error) {
             console.log('Using local site settings (Supabase table not found or empty)');
             setSettings(localSettings);

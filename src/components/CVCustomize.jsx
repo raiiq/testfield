@@ -28,6 +28,7 @@ const CVCustomize = () => {
     
     // AI Integration
     const [aiPrompt, setAiPrompt] = useState('');
+    const [userApiKey, setUserApiKey] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     
     // Notifications
@@ -135,11 +136,11 @@ const CVCustomize = () => {
         if (!aiPrompt.trim()) return showToast('Please enter your details first', 'error');
         setIsGenerating(true);
         try {
-            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GROQ_API_KEY;
+            const apiKey = userApiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GROQ_API_KEY;
             
             // If they are still using the Groq key placeholder or no key, we show a friendly error
-            if (!apiKey || apiKey.startsWith('gsk_')) {
-                showToast('Please configure your VITE_GEMINI_API_KEY in .env file', 'error');
+            if (!apiKey || apiKey.startsWith('gsk_') || apiKey === 'your_gemini_api_key_here') {
+                showToast('Please enter your Gemini API Key in the AI panel', 'error');
                 setIsGenerating(false);
                 return;
             }
@@ -378,17 +379,24 @@ IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the 
 
                         {/* AI MAGIC PANEL */}
                         <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border border-indigo-500/20 rounded-xl p-4 mb-4">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-3">
                                 <Sparkles size={14} className="text-indigo-400" />
                                 <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">AI Auto-Generate</span>
                             </div>
+                            <input 
+                                type="password" 
+                                value={userApiKey}
+                                onChange={(e) => setUserApiKey(e.target.value)}
+                                placeholder="Enter Gemini API Key (Required for live site)"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none mb-2"
+                            />
                             <textarea 
                                 dir="auto"
                                 rows={2}
                                 value={aiPrompt}
                                 onChange={(e) => setAiPrompt(e.target.value)}
                                 placeholder="E.g. I'm a Senior React Developer. Skilled in Node.js. Hobbies: Photography."
-                                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none resize-none mb-2"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none resize-none mb-3"
                             />
                             <button 
                                 onClick={handleAIGenerate}
