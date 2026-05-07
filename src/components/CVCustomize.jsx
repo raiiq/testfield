@@ -378,8 +378,73 @@ IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the 
         );
     }
 
+    const renderHistoryContent = () => (
+        <>
+            <div className="flex items-center justify-between mb-6 xl:mb-8 shrink-0">
+                <span className="text-primary text-[10px] font-bold uppercase tracking-[0.2em]">History</span>
+                <button onClick={() => setShowHistory(false)} className="xl:hidden p-1 text-white hover:text-primary transition-colors">
+                    <X size={16} />
+                </button>
+            </div>
+
+            <button 
+                onClick={createNewCV}
+                className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-3 rounded-xl text-[9px] uppercase font-bold tracking-widest transition-colors mb-6 shrink-0"
+            >
+                <Plus size={12} /> New CV
+            </button>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-4">
+                {history.map(cv => (
+                    <div 
+                        key={cv.id} 
+                        onClick={() => { loadCV(cv); setShowHistory(false); }}
+                        className={`p-3 rounded-xl border cursor-pointer transition-colors group relative ${selectedId === cv.id ? 'bg-white/10 border-white/20' : 'bg-black border-white/5 hover:border-white/20'}`}
+                    >
+                        <p className="text-xs font-bold text-[#E1E0CC] truncate mb-1 pr-6" dir="auto">{cv.cv_name}</p>
+                        <p className="text-[9px] text-gray-500 uppercase tracking-widest">{new Date(cv.updated_at).toLocaleDateString()}</p>
+                        
+                        <button 
+                            onClick={(e) => deleteCV(e, cv.id)}
+                            className="absolute right-2 top-2 p-1 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    </div>
+                ))}
+                {history.length === 0 && (
+                    <p className="text-xs text-gray-500 text-center mt-10 font-bold uppercase tracking-widest">No saved CVs</p>
+                )}
+            </div>
+        </>
+    );
+
     return (
         <>
+            {/* Mobile History Sidebar / Backdrop - Moved to Root to escape transform context */}
+            <AnimatePresence>
+                {showHistory && (
+                    <>
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowHistory(false)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] xl:hidden"
+                        />
+                        <motion.div 
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+                            className="fixed top-0 right-0 bottom-0 w-[280px] bg-[#101010] border-l border-white/5 z-[101] p-6 flex flex-col xl:hidden shadow-2xl"
+                        >
+                            {renderHistoryContent()}
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
             {/* No global print styles needed anymore, export is handled by html2pdf directly */}
 
             {/* Notification Toast */}
@@ -627,49 +692,10 @@ IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the 
                         </div>
                     </div>
 
-                    {/* RIGHT: HISTORY SIDEBAR (col-2 xl) */}
-                    <div className={`fixed inset-y-0 right-0 z-40 w-64 bg-[#101010] border-l border-white/5 pt-28 pb-6 px-6 xl:p-6 transform transition-transform duration-300 xl:relative xl:translate-x-0 xl:w-[18%] shrink-0 flex flex-col ${showHistory ? 'translate-x-0' : 'translate-x-full xl:translate-x-0'}`}>
-                        <div className="flex items-center justify-between mb-8">
-                            <span className="text-primary text-[10px] font-bold uppercase tracking-[0.2em]">History</span>
-                            <button onClick={() => setShowHistory(false)} className="xl:hidden p-1 text-white hover:text-primary"><X size={16} /></button>
-                        </div>
-
-                        <button 
-                            onClick={createNewCV}
-                            className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-3 rounded-xl text-[9px] uppercase font-bold tracking-widest transition-colors mb-6 shrink-0"
-                        >
-                            <Plus size={12} /> New CV
-                        </button>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                            {history.map(cv => (
-                                <div 
-                                    key={cv.id} 
-                                    onClick={() => loadCV(cv)}
-                                    className={`p-3 rounded-xl border cursor-pointer transition-colors group relative ${selectedId === cv.id ? 'bg-white/10 border-white/20' : 'bg-black border-white/5 hover:border-white/20'}`}
-                                >
-                                    <p className="text-xs font-bold text-[#E1E0CC] truncate mb-1 pr-6" dir="auto">{cv.cv_name}</p>
-                                    <p className="text-[9px] text-gray-500 uppercase tracking-widest">{new Date(cv.updated_at).toLocaleDateString()}</p>
-                                    
-                                    <button 
-                                        onClick={(e) => deleteCV(e, cv.id)}
-                                        className="absolute right-2 top-2 p-1 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                </div>
-                            ))}
-                            {history.length === 0 && (
-                                <p className="text-xs text-gray-500 text-center mt-10 font-bold uppercase tracking-widest">No saved CVs</p>
-                            )}
-                        </div>
+                    {/* RIGHT: HISTORY SIDEBAR (Desktop) */}
+                    <div className="hidden xl:flex flex-col relative w-[18%] shrink-0 bg-[#101010] border border-white/5 p-6 rounded-2xl max-h-[85vh]">
+                        {renderHistoryContent()}
                     </div>
-
-                    {/* Mobile overlay */}
-                    {showHistory && (
-                        <div className="fixed inset-0 bg-black/60 z-30 xl:hidden backdrop-blur-sm no-print" onClick={() => setShowHistory(false)} />
-                    )}
-
                 </div>
             </section>
 
