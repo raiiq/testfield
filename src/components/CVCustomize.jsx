@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Save, Printer, Plus, ArrowUp, ArrowDown, Trash2, FileText, X, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import domtoimage from 'dom-to-image-more';
 import jsPDF from 'jspdf';
+import AILoader from './animations/AILoader';
 
 const CVCustomize = () => {
     const { user, login } = useAuth();
@@ -421,6 +422,8 @@ IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the 
 
     return (
         <>
+            <AILoader isVisible={isGenerating} />
+
             {/* Mobile History Sidebar / Backdrop - Moved to Root to escape transform context */}
             <AnimatePresence>
                 {showHistory && (
