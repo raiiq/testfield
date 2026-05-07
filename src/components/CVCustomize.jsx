@@ -29,7 +29,9 @@ const CVCustomize = () => {
     
     // AI Integration
     const [aiPrompt, setAiPrompt] = useState('');
-    const [userApiKey, setUserApiKey] = useState('');
+    const [userApiKey, setUserApiKey] = useState(''); // Gemini
+    const [userGroqApiKey, setUserGroqApiKey] = useState(''); // Groq
+    const [preferredAi, setPreferredAi] = useState('gemini'); // 'gemini' | 'groq'
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSavingKey, setIsSavingKey] = useState(false);
     
@@ -69,12 +71,14 @@ const CVCustomize = () => {
         try {
             const { data, error } = await supabase
                 .from('user_profiles')
-                .select('gemini_api_key')
+                .select('gemini_api_key, groq_api_key, preferred_ai')
                 .eq('user_id', user.id)
                 .maybeSingle();
             if (error) throw error;
-            if (data && data.gemini_api_key) {
-                setUserApiKey(data.gemini_api_key);
+            if (data) {
+                if (data.gemini_api_key) setUserApiKey(data.gemini_api_key);
+                if (data.groq_api_key) setUserGroqApiKey(data.groq_api_key);
+                if (data.preferred_ai) setPreferredAi(data.preferred_ai);
             }
         } catch (error) {
             console.error('Error fetching user profile:', error);
@@ -82,22 +86,24 @@ const CVCustomize = () => {
     };
 
     const saveApiKey = async () => {
-        if (!user) return showToast('Please login to save your API Key', 'error');
-        if (!userApiKey.trim()) return showToast('Please enter an API Key first', 'error');
+        if (!user) return showToast('Please login to save your settings', 'error');
+        if (!userApiKey.trim() && !userGroqApiKey.trim()) return showToast('Please enter at least one API Key', 'error');
         
         setIsSavingKey(true);
         try {
             const { error } = await supabase.from('user_profiles').upsert({
                 user_id: user.id,
-                gemini_api_key: userApiKey.trim(),
+                gemini_api_key: userApiKey.trim() || null,
+                groq_api_key: userGroqApiKey.trim() || null,
+                preferred_ai: preferredAi,
                 updated_at: new Date().toISOString()
             });
             
             if (error) throw error;
-            showToast('API Key saved securely to your account', 'success');
+            showToast('API Settings saved securely to your account', 'success');
         } catch (error) {
-            console.error('Error saving API Key:', error);
-            showToast('Failed to save API Key', 'error');
+            console.error('Error saving API settings:', error);
+            showToast('Failed to save settings', 'error');
         } finally {
             setIsSavingKey(false);
         }
@@ -174,28 +180,7 @@ const CVCustomize = () => {
 
     const [isExporting, setIsExporting] = useState(false);
 
-    const handleAIGenerate = async () => {
-        if (!aiPrompt.trim()) return showToast('Please enter your details first', 'error');
-        setIsGenerating(true);
-        try {
-            const apiKey = userApiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GROQ_API_KEY;
-            
-            // If they are still using the Groq key placeholder or no key, we show a friendly error
-            if (!apiKey || apiKey.startsWith('gsk_') || apiKey === 'your_gemini_api_key_here') {
-                showToast('Please enter your Gemini API Key in the AI panel', 'error');
-                setIsGenerating(false);
-                return;
-            }
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    systemInstruction: {
-                        parts: [{
-                            text: `You are an expert CV generator. Output ONLY valid JSON, nothing else. 
+    const systemInstruction = `You are an expert CV generator. Output ONLY valid JSON, nothing else. 
 Format must be exactly this structure:
 [
   {
@@ -209,33 +194,100 @@ Format must be exactly this structure:
   }
 ]
 The user will give you their info. Invent realistic placeholder details (like company, period, phone) if missing, but keep it professional.
-IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the Arabic language by default, or match the user's input language. Ensure high-quality, professional phrasing. Return ONLY the pure JSON array, with no markdown formatting.`
-                        }]
-                    },
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [{ text: aiPrompt }]
-                        }
-                    ],
-                    generationConfig: {
-                        temperature: 0.7,
-                        responseMimeType: "application/json"
-                    }
-                })
-            });
+IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the Arabic language by default, or match the user's input language. Ensure high-quality, professional phrasing. Return ONLY the pure JSON array, with no markdown formatting.`;
 
-            if (!response.ok) {
-                const errText = await response.text();
-                console.error("Gemini API Error:", errText);
-                throw new Error('Failed to reach Gemini API');
+    const generateWithGemini = async (apiKey) => {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                contents: [{ role: 'user', parts: [{ text: aiPrompt }] }],
+                generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+            })
+        });
+
+        if (!response.ok) throw new Error(await response.text());
+        
+        const result = await response.json();
+        return JSON.parse(result.candidates[0].content.parts[0].text);
+    };
+
+    const generateWithGroq = async (apiKey) => {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'llama3-70b-8192',
+                messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: aiPrompt }
+                ],
+                temperature: 0.7,
+                response_format: { type: "json_object" }
+            })
+        });
+
+        if (!response.ok) throw new Error(await response.text());
+        
+        const result = await response.json();
+        const text = result.choices[0].message.content;
+        
+        let parsed = JSON.parse(text);
+        if (!Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+            for (const key in parsed) {
+                if (Array.isArray(parsed[key])) {
+                    parsed = parsed[key];
+                    break;
+                }
             }
-            
-            const result = await response.json();
-            const content = result.candidates[0].content.parts[0].text;
-            
-            const generatedPages = JSON.parse(content);
-            
+        }
+        return Array.isArray(parsed) ? parsed : [parsed];
+    };
+
+    const handleAIGenerate = async () => {
+        if (!aiPrompt.trim()) return showToast('Please enter your details first', 'error');
+        
+        const geminiKey = userApiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY;
+        const groqKey = userGroqApiKey.trim() || import.meta.env.VITE_GROQ_API_KEY;
+
+        if (!geminiKey && !groqKey) {
+            return showToast('Please enter at least one API Key (Gemini or Groq)', 'error');
+        }
+
+        setIsGenerating(true);
+        let generatedPages = null;
+
+        try {
+            if (preferredAi === 'gemini' && geminiKey) {
+                try {
+                    generatedPages = await generateWithGemini(geminiKey);
+                } catch (err) {
+                    console.warn("Gemini failed, trying Groq...", err);
+                    if (groqKey) generatedPages = await generateWithGroq(groqKey);
+                    else throw err;
+                }
+            } else if (preferredAi === 'groq' && groqKey) {
+                try {
+                    generatedPages = await generateWithGroq(groqKey);
+                } catch (err) {
+                    console.warn("Groq failed, trying Gemini...", err);
+                    if (geminiKey) generatedPages = await generateWithGemini(geminiKey);
+                    else throw err;
+                }
+            } else if (geminiKey) {
+                generatedPages = await generateWithGemini(geminiKey);
+            } else if (groqKey) {
+                generatedPages = await generateWithGroq(groqKey);
+            }
+
+            if (!generatedPages || !Array.isArray(generatedPages)) {
+                throw new Error("Invalid AI response format");
+            }
+
             const safePages = generatedPages.map((p, pIdx) => ({
                 id: `page_${Date.now()}_${pIdx}`,
                 layers: (p.layers || []).map((l, lIdx) => ({
@@ -490,25 +542,48 @@ IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the 
                         <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border border-indigo-500/20 rounded-xl p-4 mb-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <Sparkles size={14} className="text-indigo-400" />
-                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">AI Auto-Generate</span>
+                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">AI Engine Settings</span>
                             </div>
-                            <div className="flex gap-2 mb-2">
-                                <input 
-                                    type="password" 
-                                    value={userApiKey}
-                                    onChange={(e) => setUserApiKey(e.target.value)}
-                                    placeholder="Enter Gemini API Key"
-                                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none"
-                                />
-                                <button 
-                                    onClick={saveApiKey}
-                                    disabled={isSavingKey || !userApiKey}
-                                    className="bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg px-3 flex items-center justify-center transition-colors disabled:opacity-50"
-                                    title="Save to Account"
-                                >
-                                    <Save size={14} />
-                                </button>
+                            
+                            <div className="flex flex-col gap-2 mb-3">
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="password" 
+                                        value={userApiKey}
+                                        onChange={(e) => setUserApiKey(e.target.value)}
+                                        placeholder="Gemini API Key"
+                                        className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="password" 
+                                        value={userGroqApiKey}
+                                        onChange={(e) => setUserGroqApiKey(e.target.value)}
+                                        placeholder="Groq API Key"
+                                        className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white placeholder-gray-600 focus:border-purple-500/50 outline-none"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <select 
+                                        value={preferredAi}
+                                        onChange={(e) => setPreferredAi(e.target.value)}
+                                        className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white focus:border-indigo-500/50 outline-none uppercase font-bold tracking-widest"
+                                    >
+                                        <option value="gemini">Primary: Gemini</option>
+                                        <option value="groq">Primary: Groq</option>
+                                    </select>
+                                    <button 
+                                        onClick={saveApiKey}
+                                        disabled={isSavingKey || (!userApiKey && !userGroqApiKey)}
+                                        className="bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg px-4 py-2 flex items-center justify-center transition-colors disabled:opacity-50"
+                                        title="Save Settings to Account"
+                                    >
+                                        <Save size={14} />
+                                    </button>
+                                </div>
                             </div>
+
                             <textarea 
                                 dir="auto"
                                 rows={2}

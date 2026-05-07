@@ -81,3 +81,7 @@ ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can manage their own profile" ON user_profiles FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS groq_api_key TEXT;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_ai TEXT DEFAULT 'gemini';
+
