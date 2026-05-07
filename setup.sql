@@ -69,3 +69,15 @@ CREATE POLICY "Allow admin write projects" ON projects FOR ALL TO authenticated 
 CREATE POLICY "Allow admin write experience" ON experience FOR ALL TO authenticated USING (auth.uid() = 'YOUR-UUID-HERE');
 CREATE POLICY "Allow admin write skills" ON skills FOR ALL TO authenticated USING (auth.uid() = 'YOUR-UUID-HERE');
 CREATE POLICY "Allow admin write site_settings" ON site_settings FOR ALL TO authenticated USING (auth.uid() = 'YOUR-UUID-HERE');
+
+-- 5. USER PROFILES TABLE (For API Keys)
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    gemini_api_key TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own profile" ON user_profiles FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+

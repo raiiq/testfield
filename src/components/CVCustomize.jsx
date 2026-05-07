@@ -30,6 +30,7 @@ const CVCustomize = () => {
     const [aiPrompt, setAiPrompt] = useState('');
     const [userApiKey, setUserApiKey] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSavingKey, setIsSavingKey] = useState(false);
     
     // Notifications
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
@@ -40,6 +41,7 @@ const CVCustomize = () => {
     useEffect(() => {
         if (user) {
             fetchHistory();
+            fetchUserProfile();
         }
     }, [user]);
 
@@ -58,6 +60,45 @@ const CVCustomize = () => {
             setHistory(data || []);
         } catch (error) {
             console.error('Error fetching CV history:', error);
+        }
+    };
+
+    const fetchUserProfile = async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .select('gemini_api_key')
+                .eq('user_id', user.id)
+                .maybeSingle();
+            if (error) throw error;
+            if (data && data.gemini_api_key) {
+                setUserApiKey(data.gemini_api_key);
+            }
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+        }
+    };
+
+    const saveApiKey = async () => {
+        if (!user) return showToast('Please login to save your API Key', 'error');
+        if (!userApiKey.trim()) return showToast('Please enter an API Key first', 'error');
+        
+        setIsSavingKey(true);
+        try {
+            const { error } = await supabase.from('user_profiles').upsert({
+                user_id: user.id,
+                gemini_api_key: userApiKey.trim(),
+                updated_at: new Date().toISOString()
+            });
+            
+            if (error) throw error;
+            showToast('API Key saved securely to your account', 'success');
+        } catch (error) {
+            console.error('Error saving API Key:', error);
+            showToast('Failed to save API Key', 'error');
+        } finally {
+            setIsSavingKey(false);
         }
     };
 
@@ -383,13 +424,23 @@ IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the 
                                 <Sparkles size={14} className="text-indigo-400" />
                                 <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">AI Auto-Generate</span>
                             </div>
-                            <input 
-                                type="password" 
-                                value={userApiKey}
-                                onChange={(e) => setUserApiKey(e.target.value)}
-                                placeholder="Enter Gemini API Key (Required for live site)"
-                                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none mb-2"
-                            />
+                            <div className="flex gap-2 mb-2">
+                                <input 
+                                    type="password" 
+                                    value={userApiKey}
+                                    onChange={(e) => setUserApiKey(e.target.value)}
+                                    placeholder="Enter Gemini API Key"
+                                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white placeholder-gray-600 focus:border-indigo-500/50 outline-none"
+                                />
+                                <button 
+                                    onClick={saveApiKey}
+                                    disabled={isSavingKey || !userApiKey}
+                                    className="bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg px-3 flex items-center justify-center transition-colors disabled:opacity-50"
+                                    title="Save to Account"
+                                >
+                                    <Save size={14} />
+                                </button>
+                            </div>
                             <textarea 
                                 dir="auto"
                                 rows={2}
