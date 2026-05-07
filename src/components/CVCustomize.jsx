@@ -135,18 +135,24 @@ const CVCustomize = () => {
         if (!aiPrompt.trim()) return showToast('Please enter your details first', 'error');
         setIsGenerating(true);
         try {
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GROQ_API_KEY;
+            
+            // If they are still using the Groq key placeholder or no key, we show a friendly error
+            if (!apiKey || apiKey.startsWith('gsk_')) {
+                showToast('Please configure your VITE_GEMINI_API_KEY in .env file', 'error');
+                setIsGenerating(false);
+                return;
+            }
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'llama-3.1-8b-instant',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `You are an expert CV generator. Output ONLY valid JSON, nothing else. 
+                    systemInstruction: {
+                        parts: [{
+                            text: `You are an expert CV generator. Output ONLY valid JSON, nothing else. 
 Format must be exactly this structure:
 [
   {
@@ -159,34 +165,33 @@ Format must be exactly this structure:
     ]
   }
 ]
-The user will give you their info. Invent realistic placeholder details (like company, period, phone) if missing, but keep it professional. Do not wrap in markdown, just return a pure JSON array.`
-                        },
+The user will give you their info. Invent realistic placeholder details (like company, period, phone) if missing, but keep it professional.
+IMPORTANT INSTRUCTION FOR LANGUAGE: You MUST generate all the CV content in the Arabic language by default, or match the user's input language. Ensure high-quality, professional phrasing. Return ONLY the pure JSON array, with no markdown formatting.`
+                        }]
+                    },
+                    contents: [
                         {
                             role: 'user',
-                            content: aiPrompt
+                            parts: [{ text: aiPrompt }]
                         }
                     ],
-                    temperature: 0.7
+                    generationConfig: {
+                        temperature: 0.7,
+                        responseMimeType: "application/json"
+                    }
                 })
             });
 
             if (!response.ok) {
                 const errText = await response.text();
-                console.error("Groq API Error:", errText);
-                throw new Error('Failed to reach Groq API');
+                console.error("Gemini API Error:", errText);
+                throw new Error('Failed to reach Gemini API');
             }
             
             const result = await response.json();
-            const content = result.choices[0].message.content;
+            const content = result.candidates[0].content.parts[0].text;
             
-            // Extract the JSON array from the response, ignoring any conversational text
-            const jsonMatch = content.match(/\[\s*\{[\s\S]*\}\s*\]/);
-            if (!jsonMatch) {
-                console.error("AI Response content:", content);
-                throw new Error("Could not extract JSON array from response.");
-            }
-            
-            const generatedPages = JSON.parse(jsonMatch[0]);
+            const generatedPages = JSON.parse(content);
             
             const safePages = generatedPages.map((p, pIdx) => ({
                 id: `page_${Date.now()}_${pIdx}`,
